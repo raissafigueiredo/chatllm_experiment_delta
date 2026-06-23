@@ -57,14 +57,165 @@
         width: 100%;
         height: 100%;
         display: flex;
+        flex-direction: row;
+        min-height: 0;
+        background: #f4f5f7;
+      }
+
+      .sidebar {
+        flex: 0 0 280px;
+        min-width: 240px;
+        display: flex;
         flex-direction: column;
+        border-right: 1px solid var(--border);
+        background: #fafbfc;
+        padding: 20px;
+        gap: 18px;
+        overflow-y: auto;
+      }
+
+      .sidebar-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .sidebar-actions {
+        display: flex;
+        gap: 8px;
+      }
+
+      .sidebar-header button {
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 8px 12px;
+        background: #fff;
+        color: var(--text);
+        cursor: pointer;
+        transition: transform 150ms ease, background 150ms ease;
+      }
+
+      .clear-history {
+        background: #f7e1e0;
+        color: #922d2d;
+      }
+
+      .clear-history:hover {
+        background: #f3c8c5;
+      }
+
+      .sidebar-header button:hover {
+        transform: translateY(-1px);
+        background: #f4f4f6;
+      }
+
+      .session-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .session-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+        padding: 14px 16px;
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        background: #fff;
+        color: var(--text);
+        text-align: left;
+        cursor: pointer;
+        transition: border-color 150ms ease, background 150ms ease, box-shadow 150ms ease;
+      }
+
+      .session-item:hover {
+        border-color: #c1c4cc;
+        box-shadow: 0 1px 6px rgba(15, 23, 42, 0.08);
+      }
+
+      .session-item.active {
+        border-color: var(--accent);
+        background: #1a1a1a;
+        color: #fff;
+      }
+
+      .session-badge {
+        background: #eef2f7;
+        color: var(--muted);
+        font-size: 0.78rem;
+        border-radius: 999px;
+        padding: 4px 10px;
+      }
+
+      .chat-panel {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
       }
 
       .app-header {
         flex-shrink: 0;
-        padding: 12px 24px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        padding: 16px 24px;
         border-bottom: 1px solid var(--border);
-        text-align: center;
+        text-align: left;
+      }
+
+      .session-title {
+        font-size: 0.92rem;
+        color: var(--muted);
+      }
+
+      .messages {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        overflow-x: hidden;
+        overscroll-behavior: contain;
+        padding: 28px 20px 20px;
+      }
+
+      .messages-inner {
+        max-width: 860px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .bubble {
+        line-height: 1.75;
+        word-break: break-word;
+        overflow-wrap: anywhere;
+        animation: slideUp 180ms ease-out;
+        padding: 18px 20px;
+        border-radius: 22px;
+        margin-bottom: 0;
+        width: auto;
+        max-width: 86%;
+        box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
+      }
+
+      .bubble.assistant {
+        align-self: flex-start;
+        background: #ffffff;
+        color: var(--text);
+        border: 1px solid #e7e9ee;
+      }
+
+      .bubble.user {
+        align-self: flex-end;
+        background: #111827;
+        color: #f9fafb;
+        border-radius: 22px;
+        max-width: 78%;
       }
 
       .brand {
@@ -81,42 +232,6 @@
         overflow-x: hidden;
         overscroll-behavior: contain;
         padding: 32px 16px 16px;
-      }
-
-      .messages-inner {
-        max-width: 720px;
-        margin: 0 auto;
-        display: flex;
-        flex-direction: column;
-        gap: 0;
-      }
-
-      .bubble {
-        line-height: 1.65;
-        word-break: break-word;
-        overflow-wrap: anywhere;
-        animation: slideUp 180ms ease-out;
-        padding: 20px 0;
-      }
-
-      .bubble + .bubble {
-        border-top: none;
-      }
-
-      .bubble.assistant {
-        align-self: flex-start;
-        width: 100%;
-        font-size: 1rem;
-        color: var(--text);
-      }
-
-      .bubble.user {
-        align-self: flex-end;
-        background: var(--user-bubble);
-        padding: 12px 18px;
-        border-radius: 18px;
-        max-width: 78%;
-        font-size: 1rem;
       }
 
       .bubble pre {
