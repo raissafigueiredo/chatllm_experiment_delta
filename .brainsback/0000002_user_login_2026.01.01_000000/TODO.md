@@ -8,11 +8,17 @@
 _State clearly what you are trying to achieve and the architectural constraints, avoiding implementation specifics of HOW to do it. Focus on WHAT and WHY._
 
 ## Steps
-- [ ] _Decompose the problem into actionable logical steps._
-- [ ] _Each step should represent a verifiable piece of work._
-
+- [ ] Criar a interface de usuário
+- [ ] Configurar o esquema do banco de dados SQLite
+- [ ] Implementar a lógica de Cadastro
+- [ ] Implementar a lógica de Login
+- [ ] Corrigir eventuais bugs
+ 
 ## Success Looks Like
-- [ ] _Define rigorous, observable criteria for success. E.g., The endpoint returns 200 OK with the user object, NOT Code compiles_
+- [ ] Um novo usuário consegue criar uma conta e seus dados são salvos corretamente
+- [ ] Um usuário faz login com credenciais válidas e é redirecionado para a tela principal
+- [ ] Credenciais incorretas não permite o acesso e exibe uma mensagem de erro
+- [ ] Clicar em "Logout" encerra a sessão
 
 ## Notes
 - [ ] _Any specific edge cases, libraries to consider, or potential pitfalls._

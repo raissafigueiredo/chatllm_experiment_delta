@@ -1,7 +1,45 @@
 const { useEffect, useMemo, useRef, useState } = React;
 
-const SESSION_STORAGE_KEY = "chatllm_lab_sessions";
-const ACTIVE_SESSION_STORAGE_KEY = "chatllm_lab_active_session_id";
+const SESSION_STORAGE_PREFIX = "chatllm_lab";
+
+function getSessionStorageKeys(userId) {
+  return {
+    sessionKey: `${SESSION_STORAGE_PREFIX}_sessions_user_${userId}`,
+    activeSessionKey: `${SESSION_STORAGE_PREFIX}_active_session_id_user_${userId}`,
+  };
+}
+
+function loadSessionsFromStorage(userId) {
+  if (!userId) return null;
+
+  try {
+    const { sessionKey, activeSessionKey } = getSessionStorageKeys(userId);
+    const text = window.localStorage.getItem(sessionKey);
+    const activeId = window.localStorage.getItem(activeSessionKey);
+    if (!text) return null;
+
+    const sessions = JSON.parse(text);
+    if (!Array.isArray(sessions) || sessions.length === 0) return null;
+
+    return {
+      sessions,
+      activeSessionId:
+        activeId && sessions.some((session) => session.id === activeId)
+          ? activeId
+          : sessions[0].id,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function persistSessionsToStorage(nextSessions, nextActiveSessionId, userId) {
+  if (!userId || typeof window === "undefined") return;
+
+  const { sessionKey, activeSessionKey } = getSessionStorageKeys(userId);
+  window.localStorage.setItem(sessionKey, JSON.stringify(nextSessions));
+  window.localStorage.setItem(activeSessionKey, nextActiveSessionId);
+}
 
 function createMessageId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
@@ -44,47 +82,23 @@ function isAutoSessionTitle(title) {
   );
 }
 
-function loadSessionsFromStorage() {
-  try {
-    const text = window.localStorage.getItem(SESSION_STORAGE_KEY);
-    const activeId = window.localStorage.getItem(ACTIVE_SESSION_STORAGE_KEY);
-    if (!text) return null;
-
-    const sessions = JSON.parse(text);
-    if (!Array.isArray(sessions) || sessions.length === 0) return null;
-
-    return {
-      sessions,
-      activeSessionId: activeId && sessions.some((session) => session.id === activeId)
-        ? activeId
-        : sessions[0].id,
-    };
-  } catch {
-    return null;
-  }
-}
 
 function App() {
-  const saved = typeof window !== "undefined" ? loadSessionsFromStorage() : null;
-  const initialSessions =
-    saved?.sessions ||
-    [
-      createSession("Sessão inicial", [
-        {
-          id: createMessageId(),
-          role: "assistant",
-          content: "Bem-vindo ao ChatLLM Lab. Como posso ajudar voce hoje?",
-        },
-      ]),
-    ];
-
-  const [sessions, setSessions] = useState(initialSessions);
-  const [activeSessionId, setActiveSessionId] = useState(
-    saved?.activeSessionId || initialSessions[0].id
-  );
+  const [sessions, setSessions] = useState([
+    createSession("Sessão inicial", [
+      {
+        id: createMessageId(),
+        role: "assistant",
+        content: "Bem-vindo ao ChatLLM Lab. Como posso ajudar voce hoje?",
+      },
+    ]),
+  ]);
+  const [activeSessionId, setActiveSessionId] = useState(sessions[0].id);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
   const messagesRef = useRef(null);
   const abortControllerRef = useRef(null);
 
@@ -109,6 +123,51 @@ function App() {
     };
   }, []);
 
+  useEffect(() => {
+    const token = localStorage.getItem("authToken");
+    const storedUser = localStorage.getItem("user");
+    if (token && storedUser) {
+      try {
+        const parsedUser = JSON.parse(storedUser);
+        setUser(parsedUser);
+      } catch {
+        localStorage.removeItem("authToken");
+        localStorage.removeItem("user");
+      }
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const saved = loadSessionsFromStorage(user.id);
+    if (saved) {
+      setSessions(saved.sessions);
+      setActiveSessionId(saved.activeSessionId);
+    }
+  }, [user]);
+
+  if (loading) {
+    return <div className="loading">Carregando...</div>;
+  }
+
+  if (!user) {
+    return <AuthPage onLoginSuccess={setUser} />;
+  }
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (err) {
+      console.error("Erro ao fazer logout:", err);
+    } finally {
+      localStorage.removeItem("authToken");
+      localStorage.removeItem("user");
+      setUser(null);
+    }
+  };
+
   const updateSessionById = (id, updater) => {
     setSessionsAndPersist((prev) => prev.map((session) => (session.id === id ? updater(session) : session)));
   };
@@ -116,9 +175,7 @@ function App() {
   const updateActiveSession = (updater) => updateSessionById(activeSessionId, updater);
 
   const persistSessions = (nextSessions, nextActiveSessionId) => {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(nextSessions));
-    window.localStorage.setItem(ACTIVE_SESSION_STORAGE_KEY, nextActiveSessionId);
+    persistSessionsToStorage(nextSessions, nextActiveSessionId, user?.id);
   };
 
   const setSessionsAndPersist = (updater, nextActiveId = activeSessionId) => {
@@ -210,15 +267,6 @@ function App() {
         },
       });
 
-      updateSessionById(sessionId, (session) => ({
-        ...session,
-        messages: session.messages.map((msg) =>
-          msg.id === assistantMessageId && !msg.content.trim()
-            ? { ...msg, content: "Nao foi possivel obter resposta do modelo agora." }
-            : msg
-        ),
-      }));
-
       if (isAutoSessionTitle(activeSession.title)) {
         const newTitle = deriveSessionTitle(cleaned);
         if (newTitle !== "Nova sessão") {
@@ -226,22 +274,40 @@ function App() {
         }
       }
     } catch (err) {
+      console.error("Chat stream error:", err);
       const aborted = err?.name === "AbortError";
       if (!aborted) {
-        setError(err.message || "Falha inesperada ao gerar resposta.");
-        updateSessionById(sessionId, (session) => ({
-          ...session,
-          messages: session.messages.map((msg) =>
-            msg.id === assistantMessageId
-              ? {
-                  ...msg,
-                  content: msg.content.trim()
-                    ? msg.content
-                    : "Nao foi possivel obter resposta do modelo agora.",
-                }
-              : msg
-          ),
-        }));
+        try {
+          const reply = await sendMessage({ message: cleaned, history: chatHistory });
+          updateSessionById(sessionId, (session) => ({
+            ...session,
+            messages: session.messages.map((msg) =>
+              msg.id === assistantMessageId ? { ...msg, content: reply } : msg
+            ),
+          }));
+
+          if (isAutoSessionTitle(activeSession.title)) {
+            const newTitle = deriveSessionTitle(cleaned);
+            if (newTitle !== "Nova sessão") {
+              updateActiveSession((session) => ({ ...session, title: newTitle }));
+            }
+          }
+        } catch (fallbackErr) {
+          setError(fallbackErr.message || "Falha inesperada ao gerar resposta.");
+          updateSessionById(sessionId, (session) => ({
+            ...session,
+            messages: session.messages.map((msg) =>
+              msg.id === assistantMessageId
+                ? {
+                    ...msg,
+                    content: msg.content.trim()
+                      ? msg.content
+                      : "Nao foi possivel obter resposta do modelo agora.",
+                  }
+                : msg
+            ),
+          }));
+        }
       } else {
         updateSessionById(sessionId, (session) => ({
           ...session,
@@ -292,6 +358,12 @@ function App() {
         <header className="app-header">
           <div className="brand">ChatLLM Lab</div>
           <div className="session-title">{activeSession.title}</div>
+          <div className="header-user">
+            <span className="user-email">{user.email}</span>
+            <button type="button" className="logout-btn" onClick={handleLogout}>
+              Sair
+            </button>
+          </div>
         </header>
 
         <section className="messages" aria-live="polite" ref={messagesRef}>

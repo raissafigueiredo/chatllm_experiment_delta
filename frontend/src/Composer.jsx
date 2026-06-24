@@ -10,6 +10,7 @@ function Composer({ text, busy, error, onChangeText, onSubmit, onStop }) {
   }, [busy]);
 
   const handleSubmit = (event) => {
+    event.preventDefault();
     onSubmit(event, inputRef);
   };
 

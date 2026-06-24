@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
@@ -11,6 +13,8 @@ from backend.database import get_db
 from backend.models import ChatMessage
 from backend.schemas.chat import ChatRequest, ChatResponse
 from backend.services.openrouter import OpenRouterConfigError, generate_reply, stream_reply
+
+logger = logging.getLogger(__name__)
 
 
 router = APIRouter()
@@ -26,13 +30,16 @@ async def chat(payload: ChatRequest, db: Session = Depends(get_db)) -> ChatRespo
     try:
         reply, model_name = await generate_reply(
             user_message=payload.message,
-            history=[item.model_dump() for item in payload.history],
+            history=[item.dict() for item in payload.history],
             model=payload.model,
         )
     except OpenRouterConfigError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Unexpected error in chat endpoint")
+        raise HTTPException(status_code=500, detail="Erro interno no servidor de chat.") from exc
 
     resolved_model = payload.model or model_name or OPENROUTER_MODEL_DEFAULT
 
@@ -53,7 +60,7 @@ async def chat_stream(payload: ChatRequest, db: Session = Depends(get_db)) -> St
         try:
             async for delta in stream_reply(
                 user_message=payload.message,
-                history=[item.model_dump() for item in payload.history],
+                history=[item.dict() for item in payload.history],
                 model=payload.model,
             ):
                 full_reply += delta
@@ -63,6 +70,10 @@ async def chat_stream(payload: ChatRequest, db: Session = Depends(get_db)) -> St
             return
         except RuntimeError as exc:
             yield f"data: {json.dumps({'error': str(exc)}, ensure_ascii=True)}\n\n"
+            return
+        except Exception as exc:
+            logger.exception("Unexpected error in chat stream endpoint")
+            yield f"data: {json.dumps({'error': 'Erro interno no servidor de stream de chat.'}, ensure_ascii=True)}\n\n"
             return
 
         if full_reply.strip():
